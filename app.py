@@ -44,11 +44,11 @@ except ImportError:
 
 APP_NAME = "Only My Face"
 # Keep in sync with AppVersion in installer/OnlyMyFace.iss and version.txt.
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 # A tiny text file in the repo whose first line is the latest version. The update
 # check is best-effort: any network error is silently ignored (offline is fine).
-VERSION_URL = "https://raw.githubusercontent.com/woohyungJeon/only_my_face/main/version.txt"
-RELEASES_URL = "https://github.com/woohyungJeon/only_my_face/releases/latest"
+VERSION_URL = "https://raw.githubusercontent.com/PlumpyCarrot/only_my_face/main/version.txt"
+RELEASES_URL = "https://github.com/PlumpyCarrot/only_my_face/releases/latest"
 WINDOWS_APP_ID = "OnlyMyFace.LocalPrivacyTool.1"
 IMAGE_TYPES = [("Image files", "*.jpg *.jpeg *.png *.webp *.bmp *.tif *.tiff")]
 # One accent color, matched to the app's shield logo. Everything else in the
@@ -64,7 +64,9 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 SETTINGS_PATH = DATA_DIR / "only_my_face_settings.json"
 EXEMPTIONS_PATH = DATA_DIR / "only_my_face_exemptions.json"
 LOG_PATH = DATA_DIR / "only_my_face.log"
-FONT_FILES = (ASSETS_DIR / "fonts" / "Pretendard-Regular.otf", ASSETS_DIR / "fonts" / "Pretendard-Bold.otf")
+# Pretendard Bold renders inconsistently in Tk on some Windows setups.  Bundle
+# the Regular face only and use size/colour for hierarchy instead of fake bold.
+FONT_FILES = (ASSETS_DIR / "fonts" / "Pretendard-Regular.otf",)
 # A bundled illustrated sample (not a real person) used for the live settings
 # preview.  SAMPLE_FACE_BOX is the face region on that 300x360 image.
 SAMPLE_FACE_PATH = ASSETS_DIR / "sample-face.png"
@@ -287,7 +289,7 @@ class OnlyMyFaceApp(ctk.CTk):
         self._apply_icon_to_dialog(dialog)
         dialog.grid_columnconfigure(0, weight=1)
         dialog.grid_rowconfigure(2, weight=1)
-        ctk.CTkLabel(dialog, text="예외 인물 관리", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=22, pady=(22, 4), sticky="w")
+        ctk.CTkLabel(dialog, text="예외 인물 관리", font=ctk.CTkFont(size=20)).grid(row=0, column=0, padx=22, pady=(22, 4), sticky="w")
         ctk.CTkLabel(dialog, text="등록된 사람은 모자이크 처리에서 자동 제외됩니다.", text_color=SECONDARY_TEXT).grid(row=1, column=0, padx=22, pady=(0, 12), sticky="w")
         scroll = ctk.CTkScrollableFrame(dialog, fg_color="transparent")
         scroll.grid(row=2, column=0, padx=16, pady=4, sticky="nsew")
@@ -309,16 +311,32 @@ class OnlyMyFaceApp(ctk.CTk):
                     preview_refs.append(face_image)
                     ctk.CTkLabel(row, image=face_image, text="").pack(side="left", padx=(10, 8), pady=9)
                 else:
-                    ctk.CTkLabel(row, text="재등록", width=62, height=32, corner_radius=12, fg_color=("#FFE4E1", "#5A3030"), text_color=("#9F1D16", "#FFD2CC"), font=ctk.CTkFont(size=10, weight="bold")).pack(side="left", padx=(10, 8), pady=9)
-                ctk.CTkLabel(row, text=person["name"], font=ctk.CTkFont(size=14, weight="bold")).pack(side="left", padx=14, pady=12)
+                    ctk.CTkLabel(row, text="재등록", width=62, height=32, corner_radius=12, fg_color=("#FFE4E1", "#5A3030"), text_color=("#9F1D16", "#FFD2CC"), font=ctk.CTkFont(size=10)).pack(side="left", padx=(10, 8), pady=9)
+                ctk.CTkLabel(row, text=person["name"], font=ctk.CTkFont(size=14)).pack(side="left", padx=14, pady=12)
                 ctk.CTkLabel(row, text=f"라벨 {len(person['embeddings'])}개", text_color=SECONDARY_TEXT).pack(side="left", padx=4)
+                def add_photos(i=index) -> None:
+                    dialog.destroy()
+                    self._register_exempt_person(person_index=i)
+
+                def rename(i=index) -> None:
+                    name_dialog = ctk.CTkInputDialog(text="새 이름을 입력하세요.", title="예외 인물 이름 수정")
+                    new_name = name_dialog.get_input()
+                    if new_name and new_name.strip():
+                        self.exempt_people[i]["name"] = new_name.strip()
+                        self._save_exempt_people()
+                        render()
+
                 def remove(i=index) -> None:
                     if messagebox.askyesno("예외 인물 삭제", f"‘{self.exempt_people[i]['name']}’을 삭제할까요?", parent=dialog):
                         self.exempt_people.pop(i)
                         self._save_exempt_people()
                         self._update_exemption_button()
                         render()
-                ctk.CTkButton(row, text="삭제", width=54, height=30, fg_color="transparent", border_width=1, text_color=("#B42318", "#FFB4AB"), border_color=("#D0D2D9", "#50515F"), command=remove).pack(side="right", padx=10)
+                controls = ctk.CTkFrame(row, fg_color="transparent")
+                controls.pack(side="right", padx=10, pady=8)
+                ctk.CTkButton(controls, text="사진 추가", width=70, height=30, fg_color="transparent", border_width=1, text_color=PRIMARY_TEXT, border_color=("#D0D2D9", "#50515F"), command=add_photos).pack(side="left", padx=(0, 5))
+                ctk.CTkButton(controls, text="이름 수정", width=66, height=30, fg_color="transparent", border_width=1, text_color=PRIMARY_TEXT, border_color=("#D0D2D9", "#50515F"), command=rename).pack(side="left", padx=(0, 5))
+                ctk.CTkButton(controls, text="삭제", width=54, height=30, fg_color="transparent", border_width=1, text_color=("#B42318", "#FFB4AB"), border_color=("#D0D2D9", "#50515F"), command=remove).pack(side="left")
             if len(self.exempt_people) <= 4:
                 scroll._scrollbar.grid_remove()
 
@@ -329,14 +347,20 @@ class OnlyMyFaceApp(ctk.CTk):
         render()
         ctk.CTkButton(dialog, text="+ 예외 인물 추가", command=add_person, height=40, fg_color=ACCENT, text_color="white").grid(row=3, column=0, padx=20, pady=18, sticky="ew")
 
-    def _register_exempt_person(self) -> None:
+    def _register_exempt_person(self, person_index: int | None = None) -> None:
         if self.processing:
             return
-        dialog = ctk.CTkInputDialog(text="이 사람은 모자이크하지 않습니다.", title="예외 인물 추가")
-        name = dialog.get_input()
-        if not name or not name.strip():
-            return
-        paths = filedialog.askopenfilenames(title="예외할 인물 사진 선택 (여러 장 가능)", filetypes=IMAGE_TYPES)
+        if person_index is None:
+            dialog = ctk.CTkInputDialog(text="이 사람은 모자이크하지 않습니다.", title="예외 인물 추가")
+            name = dialog.get_input()
+            if not name or not name.strip():
+                return
+            name = name.strip()
+            title = "예외할 인물 사진 선택 (여러 장 가능)"
+        else:
+            name = self.exempt_people[person_index]["name"]
+            title = f"‘{name}’에 추가할 사진 선택 (여러 장 가능)"
+        paths = filedialog.askopenfilenames(title=title, filetypes=IMAGE_TYPES)
         if not paths:
             return
         self.processing = True
@@ -344,8 +368,9 @@ class OnlyMyFaceApp(ctk.CTk):
         self.exemption_button.configure(state="disabled", text="얼굴 등록 중...")
         self._set_status("예외 인물의 얼굴 특징을 등록하는 중입니다. 처음에는 모델 다운로드가 필요할 수 있어요.", "busy")
         self._show_progress()
-        self._append_log(f"예외 인물 등록 시작: {name} / 사진 {len(paths)}장")
-        threading.Thread(target=self._register_worker, args=(name.strip(), [Path(path) for path in paths]), daemon=True).start()
+        action = "사진 추가" if person_index is not None else "등록"
+        self._append_log(f"예외 인물 {action} 시작: {name} / 사진 {len(paths)}장")
+        threading.Thread(target=self._register_worker, args=(name, [Path(path) for path in paths], person_index), daemon=True).start()
         self.after(100, self._read_worker_messages)
 
     @staticmethod
@@ -361,7 +386,7 @@ class OnlyMyFaceApp(ctk.CTk):
         analyzer.prepare(ctx_id=0 if "CUDAExecutionProvider" in providers else -1, det_size=(1280, 1280), det_thresh=det_thresh)
         return analyzer
 
-    def _register_worker(self, name: str, paths: list[Path]) -> None:
+    def _register_worker(self, name: str, paths: list[Path], person_index: int | None = None) -> None:
         try:
             analyzer = self._make_analyzer()
             candidates: list[dict] = []
@@ -380,11 +405,11 @@ class OnlyMyFaceApp(ctk.CTk):
                     candidates.append({"source": path.name, "face_index": face_index, "crop": crop, "embedding": face.normed_embedding.astype(float).tolist()})
             if not candidates:
                 raise ValueError("선택한 사진에서 등록할 얼굴을 찾지 못했습니다.")
-            self.worker_messages.put(("registration_candidates", {"name": name, "candidates": candidates, "skipped": skipped}))
+            self.worker_messages.put(("registration_candidates", {"name": name, "candidates": candidates, "skipped": skipped, "person_index": person_index}))
         except Exception as error:
             self.worker_messages.put(("registration_error", f"{error}\n\n{traceback.format_exc()}"))
 
-    def _open_face_label_dialog(self, name: str, candidates: list[dict], skipped: list[str]) -> None:
+    def _open_face_label_dialog(self, name: str, candidates: list[dict], skipped: list[str], person_index: int | None = None) -> None:
         dialog = ctk.CTkToplevel(self)
         dialog.title(f"예외 인물 라벨링 — {name}")
         dialog.geometry("760x620")
@@ -393,7 +418,8 @@ class OnlyMyFaceApp(ctk.CTk):
         self._apply_icon_to_dialog(dialog)
         dialog.grid_columnconfigure(0, weight=1)
         dialog.grid_rowconfigure(2, weight=1)
-        ctk.CTkLabel(dialog, text=f"‘{name}’인 얼굴만 선택하세요", font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, padx=22, pady=(20, 4), sticky="w")
+        heading = f"‘{name}’에 추가할 얼굴만 선택하세요" if person_index is not None else f"‘{name}’인 얼굴만 선택하세요"
+        ctk.CTkLabel(dialog, text=heading, font=ctk.CTkFont(size=18)).grid(row=0, column=0, padx=22, pady=(20, 4), sticky="w")
         ctk.CTkLabel(dialog, text="사진마다 여러 얼굴이 보이면 본인 얼굴만 체크합니다. 선택한 얼굴 특징만 저장됩니다.", text_color=SECONDARY_TEXT).grid(row=1, column=0, padx=22, pady=(0, 12), sticky="w")
         scroll = ctk.CTkScrollableFrame(dialog, fg_color="transparent")
         scroll.grid(row=2, column=0, padx=16, pady=4, sticky="nsew")
@@ -416,15 +442,22 @@ class OnlyMyFaceApp(ctk.CTk):
                 messagebox.showwarning("얼굴 선택 필요", "등록할 얼굴을 한 개 이상 선택하세요.", parent=dialog)
                 return
             selected_candidate = next(candidate for candidate, selected in zip(candidates, selections) if selected.get())
-            self.exempt_people.append({"name": name, "embeddings": embeddings, "preview": self._encode_face_preview(selected_candidate["crop"])})
+            if person_index is None:
+                self.exempt_people.append({"name": name, "embeddings": embeddings, "preview": self._encode_face_preview(selected_candidate["crop"])})
+            else:
+                person = self.exempt_people[person_index]
+                person["embeddings"].extend(embeddings)
+                if not person.get("preview"):
+                    person["preview"] = self._encode_face_preview(selected_candidate["crop"])
             self._save_exempt_people()
             self.processing = False
             self.exemption_button.configure(state="normal")
             self._update_exemption_button()
             self.process_button.configure(state="normal" if self.image_paths else "disabled")
             skipped_text = f" / 얼굴 없음 {len(skipped)}장" if skipped else ""
-            self.status.configure(text=f"예외 인물 ‘{name}’ 등록 완료 — 선택 얼굴 {len(embeddings)}개{skipped_text}")
-            self._append_log(f"예외 인물 라벨링 완료: {name} / 선택 얼굴 {len(embeddings)}개{skipped_text}")
+            action = "사진 추가 완료" if person_index is not None else "등록 완료"
+            self.status.configure(text=f"예외 인물 ‘{name}’ {action} — 선택 얼굴 {len(embeddings)}개{skipped_text}")
+            self._append_log(f"예외 인물 {action}: {name} / 선택 얼굴 {len(embeddings)}개{skipped_text}")
             dialog.destroy()
 
         def cancel() -> None:
@@ -450,23 +483,23 @@ class OnlyMyFaceApp(ctk.CTk):
 
         brand = ctk.CTkFrame(sidebar, fg_color="transparent")
         brand.grid(row=0, column=0, padx=22, pady=(18, 12), sticky="ew")
-        ctk.CTkLabel(brand, text="◉  ONLY MY FACE", font=ctk.CTkFont(size=18, weight="bold"), text_color=ACCENT).pack(anchor="w")
+        ctk.CTkLabel(brand, text="◉  ONLY MY FACE", font=ctk.CTkFont(size=18), text_color=ACCENT).pack(anchor="w")
         ctk.CTkLabel(brand, text="사진은 PC 밖으로 나가지 않아요", font=ctk.CTkFont(size=12), text_color=SECONDARY_TEXT).pack(anchor="w", pady=(5, 0))
 
         upload = ctk.CTkFrame(sidebar, corner_radius=16, fg_color=("#EFEFF2", "#1B1B20"))
         upload.grid(row=1, column=0, padx=18, pady=(0, 12), sticky="ew")
-        ctk.CTkLabel(upload, text="사진 추가", font=ctk.CTkFont(size=15, weight="bold")).pack(anchor="w", padx=14, pady=(12, 2))
+        ctk.CTkLabel(upload, text="사진 추가", font=ctk.CTkFont(size=15)).pack(anchor="w", padx=14, pady=(12, 2))
         ctk.CTkLabel(upload, text="여러 장을 한 번에 선택할 수 있어요.", font=ctk.CTkFont(size=11), text_color=SECONDARY_TEXT).pack(anchor="w", padx=14)
         ctk.CTkButton(upload, text="파일 선택", command=self.select_images, height=34, fg_color=ACCENT, hover_color=ACCENT_HOVER).pack(fill="x", padx=14, pady=10)
 
-        ctk.CTkLabel(sidebar, text="처리 설정", font=ctk.CTkFont(size=15, weight="bold")).grid(row=2, column=0, padx=22, pady=(0, 5), sticky="w")
+        ctk.CTkLabel(sidebar, text="처리 설정", font=ctk.CTkFont(size=15)).grid(row=2, column=0, padx=22, pady=(0, 5), sticky="w")
         settings = ctk.CTkFrame(sidebar, fg_color="transparent")
         settings.grid(row=3, column=0, padx=18, pady=(0, 2), sticky="ew")
         settings.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(settings, text="효과", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(settings, text="효과", font=ctk.CTkFont(size=12)).grid(row=0, column=0, sticky="w")
         ctk.CTkSegmentedButton(settings, values=["모자이크", "블러"], variable=self.style_var, height=30, selected_color=ACCENT, selected_hover_color=ACCENT_HOVER).grid(row=1, column=0, pady=(3, 7), sticky="ew")
-        ctk.CTkLabel(settings, text="처리 강도", font=ctk.CTkFont(size=12, weight="bold")).grid(row=2, column=0, sticky="w")
+        ctk.CTkLabel(settings, text="처리 강도", font=ctk.CTkFont(size=12)).grid(row=2, column=0, sticky="w")
         ctk.CTkSegmentedButton(settings, values=["연하게", "보통", "강하게"], variable=self.preset_var, command=self._apply_preset, height=30, selected_color=ACCENT, selected_hover_color=ACCENT_HOVER).grid(row=3, column=0, pady=(3, 7), sticky="ew")
         self._slider(settings, 5, "효과 강도", self.strength_var, 8, 40, "픽셀 크기 / 흐림 정도")
         self._slider(settings, 8, "얼굴 주변 여백", self.padding_var, 0, 45, "얼굴 박스보다 넓게 처리")
@@ -474,7 +507,7 @@ class OnlyMyFaceApp(ctk.CTk):
 
         self.file_count = ctk.CTkLabel(sidebar, text="선택한 사진 없음", font=ctk.CTkFont(size=12), text_color=SECONDARY_TEXT)
         self.file_count.grid(row=5, column=0, padx=22, pady=(4, 8), sticky="sw")
-        self.process_button = ctk.CTkButton(sidebar, text="모든 얼굴 가리기", command=self.start_processing, height=48, font=ctk.CTkFont(size=15, weight="bold"), fg_color=ACCENT, hover_color=ACCENT_HOVER, state="disabled")
+        self.process_button = ctk.CTkButton(sidebar, text="모든 얼굴 가리기", command=self.start_processing, height=48, font=ctk.CTkFont(size=15), fg_color=ACCENT, hover_color=ACCENT_HOVER, state="disabled")
         self.process_button.grid(row=6, column=0, padx=18, pady=(0, 8), sticky="ew")
         self.progress_bar = ctk.CTkProgressBar(sidebar, height=6, progress_color=ACCENT)
         self.progress_bar.set(0)
@@ -489,7 +522,7 @@ class OnlyMyFaceApp(ctk.CTk):
         header = ctk.CTkFrame(content, fg_color="transparent")
         header.grid(row=0, column=0, padx=30, pady=(28, 8), sticky="ew")
         header.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(header, text="결과 미리보기", font=ctk.CTkFont(size=24, weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(header, text="결과 미리보기", font=ctk.CTkFont(size=24)).grid(row=0, column=0, sticky="w")
         button_style = {"fg_color": "transparent", "border_width": 1, "text_color": PRIMARY_TEXT, "border_color": ("#B9BBC8", "#555664"), "hover_color": ("#E9E9F1", "#2D2D3A")}
         self.exemption_button = ctk.CTkButton(header, text=f"예외 인물 관리 ({len(self.exempt_people)})", command=self._open_exemption_manager, width=138, height=36, **button_style)
         self.exemption_button.grid(row=0, column=1, sticky="e")
@@ -498,7 +531,7 @@ class OnlyMyFaceApp(ctk.CTk):
         self.log_button = ctk.CTkButton(header, text="로그 보기", command=self._toggle_log, width=88, height=36, **button_style)
         self.log_button.grid(row=0, column=3, padx=(8, 0), sticky="e")
         theme_text = "☾" if self.appearance_mode == "light" else "☀"
-        self.theme_button = ctk.CTkButton(header, text=theme_text, command=self._toggle_appearance_mode, width=40, height=36, font=ctk.CTkFont(size=17, weight="bold"), **button_style)
+        self.theme_button = ctk.CTkButton(header, text=theme_text, command=self._toggle_appearance_mode, width=40, height=36, font=ctk.CTkFont(size=17), **button_style)
         self.theme_button.grid(row=0, column=4, padx=(8, 0), sticky="e")
         self.update_button = ctk.CTkButton(header, text="● 새 버전 있음", command=lambda: webbrowser.open(RELEASES_URL), width=118, height=36, fg_color=ACCENT, hover_color=ACCENT_HOVER, text_color="white")
         self.update_button.grid(row=0, column=5, padx=(8, 0), sticky="e")
@@ -542,7 +575,7 @@ class OnlyMyFaceApp(ctk.CTk):
         line = ctk.CTkFrame(parent, fg_color="transparent")
         line.grid(row=row, column=0, sticky="ew")
         line.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(line, text=title, font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(line, text=title, font=ctk.CTkFont(size=12)).grid(row=0, column=0, sticky="w")
         value = ctk.CTkLabel(line, textvariable=variable, font=ctk.CTkFont(size=12), text_color=ACCENT)
         value.grid(row=0, column=1, sticky="e")
         ctk.CTkSlider(parent, from_=low, to=high, number_of_steps=round((high-low)/step), variable=variable, button_color=ACCENT, progress_color=ACCENT).grid(row=row+1, column=0, pady=(2, 0), sticky="ew")
@@ -827,7 +860,7 @@ class OnlyMyFaceApp(ctk.CTk):
                 self._hide_progress()
                 self._set_status("등록할 얼굴을 선택해 주세요.", "busy")
                 self._append_log(f"예외 인물 후보 {len(data['candidates'])}개 감지 — 사용자 라벨링 대기")
-                self._open_face_label_dialog(data["name"], data["candidates"], data["skipped"])
+                self._open_face_label_dialog(data["name"], data["candidates"], data["skipped"], data.get("person_index"))
             elif kind == "registration_error":
                 self.processing = False
                 self._hide_progress()
