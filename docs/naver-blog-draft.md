@@ -30,7 +30,7 @@
 
 1. 아래 링크에서 `OnlyMyFace-Setup.exe`를 내려받으세요.
 
-   👉 **[다운로드 링크]**  *(예: https://github.com/woohyungJeon/only_my_face/releases 최신 릴리스)*
+   👉 **https://github.com/woohyungJeon/onlymyface/releases/latest**
 
 2. 받은 파일을 더블클릭해 설치합니다. (설치 후 바탕화면에 아이콘이 생겨요)
 
