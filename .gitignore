@@ -2,3 +2,13 @@ envs/
 __pycache__/
 *.py[cod]
 .vscode/
+
+# Build artifacts — regenerated locally by build_release.ps1 / PyInstaller.
+build/
+dist/
+release/
+
+# Runtime logs / user data (the app writes these under %LOCALAPPDATA%\OnlyMyFace).
+*.log
+only_my_face_settings.json
+only_my_face_exemptions.json

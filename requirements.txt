@@ -1,0 +1,6 @@
+customtkinter>=5.2.2
+insightface>=0.7.3
+# CPU runtime: portable Windows distribution with no NVIDIA CUDA requirement.
+onnxruntime>=1.24.2
+numpy>=1.26.0
+Pillow>=10.0.0
