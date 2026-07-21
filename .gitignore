@@ -12,3 +12,14 @@ release/
 *.log
 only_my_face_settings.json
 only_my_face_exemptions.json
+
+# Secrets / credentials — nothing here today, but never let these get committed.
+.env
+*.env
+*.key
+*.pem
+*.pfx
+secrets.*
+credentials.*
+*_token*
+*.local.json
