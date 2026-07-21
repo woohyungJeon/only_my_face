@@ -45,10 +45,10 @@ except ImportError:
 APP_NAME = "Only My Face"
 # Keep in sync with AppVersion in installer/OnlyMyFace.iss and version.txt.
 APP_VERSION = "1.1.0"
-# A tiny text file on GitHub whose first line is the latest version. The update
-# check is best-effort: any network error is silently ignored (offline is fine).
-VERSION_URL = "https://raw.githubusercontent.com/woohyungJeon/only_my_face/main/version.txt"
-RELEASES_URL = "https://github.com/woohyungJeon/only_my_face/releases"
+# A tiny text file in the PUBLIC download repo whose first line is the latest
+# version. The update check is best-effort: network errors are silently ignored.
+VERSION_URL = "https://raw.githubusercontent.com/woohyungJeon/onlymyface/main/version.txt"
+RELEASES_URL = "https://github.com/woohyungJeon/onlymyface/releases/latest"
 WINDOWS_APP_ID = "OnlyMyFace.LocalPrivacyTool.1"
 IMAGE_TYPES = [("Image files", "*.jpg *.jpeg *.png *.webp *.bmp *.tif *.tiff")]
 # One accent color, matched to the app's shield logo. Everything else in the
