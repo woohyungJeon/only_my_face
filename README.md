@@ -13,7 +13,7 @@ py -3.12 -m pip install -r requirements.txt
 py -3.12 app.py
 ```
 
-첫 처리 때 InsightFace `buffalo_l` 얼굴 검출 모델이 자동으로 다운로드됩니다. 네트워크와 저장 공간 약 326MB가 필요하며, 이후에는 로컬에서 실행됩니다.
+얼굴 검출과 예외 인물 비교에 필요한 YuNet, MP-PersonDet 및 SFace 모델은 앱에 포함되어 있습니다. 첫 실행 시 모델 다운로드가 필요하지 않습니다.
 
 ## 사용법
 
@@ -22,7 +22,7 @@ py -3.12 app.py
 3. **모든 얼굴 가리기**를 누르고 결과를 확인합니다.
 4. **결과 전체 저장**으로 원본명 뒤에 `_mosaic.jpg`가 붙은 파일을 저장합니다.
 
-`buffalo_l` 사전학습 모델은 비상업 연구·개인 프로젝트 용도로 사용합니다. 상업적 배포나 서비스 전환 전에는 InsightFace 모델 라이선스를 별도로 검토해야 합니다.
+YuNet(MIT), MP-PersonDet(Apache-2.0) 및 SFace(Apache-2.0) 모델의 라이선스 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 및 `assets/models` 폴더에 포함되어 있습니다.
 
 ## 일반 사용자용 Windows 설치 파일 만들기
 
@@ -31,17 +31,16 @@ py -3.12 app.py
 설치본에는 다음을 모두 포함합니다.
 
 - 64비트 Python 3.12 실행 환경과 필수 DLL
-- 얼굴 인식 라이브러리와 CPU용 ONNX Runtime
-- InsightFace `buffalo_l` 모델 (약 326MB)
+- OpenCV 실행 환경
+- YuNet 얼굴 검출 모델, MP-PersonDet 옆·뒷모습 안전망, SFace 예외 인물 비교 모델
 - Pretendard 글꼴과 앱 아이콘
 
 따라서 설치 후에는 인터넷 없이 실행할 수 있습니다. 설치본 용량은 모델과 실행 환경 때문에 수백 MB 수준입니다. 설정, 예외 인물, 로그는 `%LOCALAPPDATA%\OnlyMyFace`에 저장되므로 업데이트와 제거 과정에서도 유지됩니다.
 
 ### 빌드하는 사람만 하는 작업
 
-1. Python 3.12에서 앱을 한 번 실행해 `buffalo_l` 모델을 내려받습니다.
-2. [Inno Setup 6](https://jrsoftware.org/isinfo.php)을 설치합니다.
-3. 프로젝트 폴더에서 다음을 실행합니다.
+1. [Inno Setup 6](https://jrsoftware.org/isinfo.php)을 설치합니다.
+2. 프로젝트 폴더에서 다음을 실행합니다.
 
 ```powershell
 .\build_release.ps1

@@ -1,6 +1,6 @@
 ; Compile with Inno Setup 6.  build_release.ps1 creates release\OnlyMyFace-build first.
 #define AppName "Only My Face"
-#define AppVersion "1.1.1"
+#define AppVersion "1.1.2"
 #define AppPublisher "Only My Face"
 #define AppExeName "OnlyMyFace.vbs"
 

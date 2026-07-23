@@ -7,6 +7,11 @@ __pycache__/
 build/
 dist/
 release/
+dist-private/
+research_private/
+
+# Local detector test images (downloaded datasets must not enter releases).
+test_images/
 
 # Runtime logs / user data (the app writes these under %LOCALAPPDATA%\OnlyMyFace).
 *.log

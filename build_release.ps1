@@ -9,20 +9,14 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot = $PSScriptRoot
 $StageRoot = Join-Path $ProjectRoot 'release\OnlyMyFace-build'
 $RuntimeRoot = Join-Path $StageRoot 'runtime'
-$ModelSource = Join-Path $env:USERPROFILE '.insightface\models\buffalo_l'
-$ModelDestination = Join-Path $StageRoot 'models\insightface\models\buffalo_l'
 
-& $Python @PythonArgs -c "import insightface, onnxruntime; print('Runtime check:', onnxruntime.__version__)"
+& $Python @PythonArgs -c "import customtkinter, cv2, numpy; print('Runtime check:', cv2.__version__)"
 if ($LASTEXITCODE -ne 0) { throw 'The selected Python does not have the required app packages.' }
-
-if (-not (Test-Path -LiteralPath $ModelSource)) {
-  throw "buffalo_l model is missing. Start the development app once and process a photo first: $ModelSource"
-}
 
 if (Test-Path -LiteralPath $StageRoot) {
   Remove-Item -LiteralPath $StageRoot -Recurse -Force
 }
-New-Item -ItemType Directory -Force -Path $RuntimeRoot, $ModelDestination | Out-Null
+New-Item -ItemType Directory -Force -Path $RuntimeRoot | Out-Null
 
 # Copy the known-good Python installation used to run the app.  A venv is not
 # used because it still points to a Python installation on the build PC.
@@ -38,7 +32,12 @@ Copy-Item -Path (Join-Path $PythonHome '*') -Destination $RuntimeRoot -Recurse -
   (Join-Path $RuntimeRoot 'Lib\ensurepip'),
   (Join-Path $RuntimeRoot 'Lib\site-packages\pip'),
   (Join-Path $RuntimeRoot 'Lib\site-packages\setuptools'),
-  (Join-Path $RuntimeRoot 'Lib\site-packages\wheel')
+  (Join-Path $RuntimeRoot 'Lib\site-packages\wheel'),
+  (Join-Path $RuntimeRoot 'Lib\site-packages\insightface'),
+  (Join-Path $RuntimeRoot 'Lib\site-packages\onnx'),
+  (Join-Path $RuntimeRoot 'Lib\site-packages\onnxruntime'),
+  (Join-Path $RuntimeRoot 'Lib\site-packages\scipy'),
+  (Join-Path $RuntimeRoot 'Lib\site-packages\skimage')
 ) | ForEach-Object {
   if (Test-Path -LiteralPath $_) { Remove-Item -LiteralPath $_ -Recurse -Force }
 }
@@ -52,10 +51,10 @@ Get-ChildItem -LiteralPath (Join-Path $RuntimeRoot 'Lib\site-packages') -Directo
 
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'app.py') -Destination $StageRoot -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'assets') -Destination $StageRoot -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $ProjectRoot 'THIRD_PARTY_NOTICES.md') -Destination $StageRoot -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot 'installer\OnlyMyFace.vbs') -Destination $StageRoot -Force
-Copy-Item -Path (Join-Path $ModelSource '*') -Destination $ModelDestination -Recurse -Force
 
-& (Join-Path $RuntimeRoot 'python.exe') -c "import customtkinter, insightface, onnxruntime; print('Bundled runtime is ready')"
+& (Join-Path $RuntimeRoot 'python.exe') -c "import customtkinter, cv2, numpy; print('Bundled runtime is ready')"
 if ($LASTEXITCODE -ne 0) { throw 'The staged runtime could not import the required packages.' }
 
 $InnoSetup = Get-Command iscc.exe -ErrorAction SilentlyContinue
