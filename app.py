@@ -379,6 +379,7 @@ class OnlyMyFaceApp(ctk.CTk):
         self._preview_after: str | None = None
         self._build_ui()
         self._apply_window_icon()
+        self.after(20, lambda: self._center_window(self, parent=None))
         # Live-update the settings preview whenever an effect-related control moves.
         for effect_var in (self.style_var, self.strength_var, self.padding_var):
             effect_var.trace_add("write", self._on_setting_changed)
@@ -441,6 +442,24 @@ class OnlyMyFaceApp(ctk.CTk):
             dialog.iconbitmap(str(self.icon_path.resolve()))
         except Exception:
             pass
+
+    def _center_window(self, window, parent=None) -> None:
+        """Center the main window on screen and dialogs over their parent."""
+        window.update_idletasks()
+        width = window.winfo_width()
+        height = window.winfo_height()
+        screen_width = window.winfo_screenwidth()
+        screen_height = window.winfo_screenheight()
+        if parent is not None:
+            parent.update_idletasks()
+            x = parent.winfo_rootx() + max(0, (parent.winfo_width() - width) // 2)
+            y = parent.winfo_rooty() + max(0, (parent.winfo_height() - height) // 2)
+        else:
+            x = (screen_width - width) // 2
+            y = (screen_height - height) // 2
+        x = max(0, min(x, screen_width - width))
+        y = max(0, min(y, screen_height - height))
+        window.geometry(f"{width}x{height}+{x}+{y}")
 
     @staticmethod
     def _load_appearance_mode() -> Literal["light", "dark"]:
@@ -590,6 +609,7 @@ class OnlyMyFaceApp(ctk.CTk):
 
         render()
         ctk.CTkButton(dialog, text="+ 예외 인물 추가", command=add_person, height=40, fg_color=ACCENT, text_color="white").grid(row=3, column=0, padx=20, pady=18, sticky="ew")
+        dialog.after(10, lambda: self._center_window(dialog, parent=self))
 
     def _register_exempt_person(self, person_index: int | None = None) -> None:
         if self.processing:
@@ -728,6 +748,7 @@ class OnlyMyFaceApp(ctk.CTk):
 
         dialog.protocol("WM_DELETE_WINDOW", cancel)
         ctk.CTkButton(dialog, text="선택한 얼굴 등록", command=finish, height=40, fg_color=ACCENT, text_color="white").grid(row=3, column=0, padx=22, pady=16, sticky="e")
+        dialog.after(10, lambda: self._center_window(dialog, parent=self))
 
     def _build_ui(self) -> None:
         self.grid_columnconfigure(1, weight=1)
@@ -1196,8 +1217,9 @@ class OnlyMyFaceApp(ctk.CTk):
         """Let the user guarantee privacy for a face no detector could see."""
         dialog = ctk.CTkToplevel(self)
         dialog.title(f"놓친 부분 가리기 — {result.source.name}")
-        dialog.geometry("1120x800")
-        dialog.minsize(760, 560)
+        # Fit common 1366×768 displays while keeping enough room to draw.
+        dialog.geometry("1060x720")
+        dialog.minsize(720, 540)
         dialog.transient(self)
         dialog.grab_set()
         self._apply_icon_to_dialog(dialog)
@@ -1224,7 +1246,7 @@ class OnlyMyFaceApp(ctk.CTk):
         # view is impractical for phone photos, so convert canvas coordinates
         # back to source pixels using this scale.
         image = result.image
-        max_width, max_height = 1030, 630
+        max_width, max_height = 970, 500
         scale = min(max_width / image.width, max_height / image.height, 1.0)
         shown_size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
         shown = image.resize(shown_size, Image.Resampling.LANCZOS) if scale < 1 else image.copy()
@@ -1236,6 +1258,15 @@ class OnlyMyFaceApp(ctk.CTk):
         dialog._manual_mask_image = tk_image
 
         drag: dict[str, int | None] = {"x": None, "y": None, "item": None}
+        undo_stack: list[Image.Image] = []
+
+        def refresh_canvas() -> None:
+            updated = result.image.resize(shown_size, Image.Resampling.LANCZOS) if scale < 1 else result.image.copy()
+            next_image = ImageTk.PhotoImage(updated)
+            dialog._manual_mask_image = next_image
+            canvas.delete("all")
+            canvas.create_image(0, 0, image=next_image, anchor="nw")
+            drag["item"] = None
 
         def start(event) -> None:
             drag["x"], drag["y"] = event.x, event.y
@@ -1253,18 +1284,21 @@ class OnlyMyFaceApp(ctk.CTk):
             left, right = sorted((int(drag["x"]), int(event.x)))
             top, bottom = sorted((int(drag["y"]), int(event.y)))
             drag["x"], drag["y"] = None, None
-            if right - left < 8 or bottom - top < 8:
+            if right - left < 3 or bottom - top < 3:
                 if drag["item"] is not None:
                     canvas.delete(drag["item"])
                 drag["item"] = None
                 return
             # A small automatic margin makes manual selection forgiving without
             # asking users to trace the exact contour of a face.
-            margin = max(4, round(8 / scale))
+            # Preserve precise tiny selections; the user can draw a bigger box
+            # when they want to cover more of a face.
+            margin = max(1, round(2 / scale))
             x1 = max(0, int(left / scale) - margin)
             y1 = max(0, int(top / scale) - margin)
             x2 = min(image.width, int(right / scale) + margin)
             y2 = min(image.height, int(bottom / scale) + margin)
+            undo_stack.append(result.image.copy())
             region = result.image.crop((x1, y1, x2, y2))
             result.image.paste(
                 self._apply_effect(region, self.style_var.get(), int(self.strength_var.get())),
@@ -1274,22 +1308,37 @@ class OnlyMyFaceApp(ctk.CTk):
             self._append_log(f"수동 가리기: {result.source.name} / 영역 {x2 - x1}×{y2 - y1}")
             self._set_status("놓친 부분을 가렸습니다. 더 있으면 계속 드래그하거나 ‘완료’를 누르세요.", "done")
             # Show the updated image immediately and allow another selection.
-            updated = result.image.resize(shown_size, Image.Resampling.LANCZOS) if scale < 1 else result.image.copy()
-            next_image = ImageTk.PhotoImage(updated)
-            dialog._manual_mask_image = next_image
-            canvas.delete("all")
-            canvas.create_image(0, 0, image=next_image, anchor="nw")
-            drag["item"] = None
+            refresh_canvas()
 
         canvas.bind("<ButtonPress-1>", start)
         canvas.bind("<B1-Motion>", move)
         canvas.bind("<ButtonRelease-1>", finish)
+
+        def undo() -> None:
+            if not undo_stack:
+                return
+            result.image = undo_stack.pop()
+            result.masked_count = max(0, result.masked_count - 1)
+            refresh_canvas()
+            self._set_status("방금 수동 가리기 작업을 되돌렸습니다.", "idle")
+
+        ctk.CTkButton(
+            dialog,
+            text="되돌리기",
+            command=undo,
+            height=40,
+            fg_color="transparent",
+            border_width=1,
+            border_color=("#737786", "#777B88"),
+            text_color=PRIMARY_TEXT,
+        ).grid(row=2, column=0, padx=22, pady=(0, 18), sticky="w")
 
         def done() -> None:
             dialog.destroy()
             self._refresh_result_previews()
 
         ctk.CTkButton(dialog, text="완료", command=done, height=40, fg_color=ACCENT, hover_color=ACCENT_HOVER).grid(row=2, column=0, padx=22, pady=(0, 18), sticky="e")
+        dialog.after(10, lambda: self._center_window(dialog, parent=self))
 
     def _add_preview(self, result: ProcessedImage, clear_first: bool = True, row: int | None = None) -> None:
         if len(self.results) == 1 and clear_first:
@@ -1376,6 +1425,7 @@ class OnlyMyFaceApp(ctk.CTk):
         dialog.bind("<Left>", lambda _event: move(-1))
         dialog.bind("<Right>", lambda _event: move(1))
         dialog.focus_set()
+        dialog.after(10, lambda: self._center_window(dialog, parent=self))
         render()
 
     def _open_result_preview(self, result: ProcessedImage) -> None:
